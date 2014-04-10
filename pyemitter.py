@@ -1,4 +1,6 @@
-from functools import wraps
+import logging
+
+log = logging.getLogger(__name__)
 
 
 class Emitter(object):
@@ -24,6 +26,8 @@ class Emitter(object):
             # assume decorator, wrap
             return self.__wrap(self.on, event)
 
+        log.debug('on(event: %s, func: %s)', repr(event), repr(func))
+
         self.ensure_constructed()
 
         if event not in self.__callbacks:
@@ -39,6 +43,8 @@ class Emitter(object):
             # assume decorator, wrap
             return self.__wrap(self.once, event)
 
+        log.debug('once(event: %s, func: %s)', repr(event), repr(func))
+
         def once_callback(*args, **kwargs):
             self.off(event, once_callback)
             func(*args, **kwargs)
@@ -48,6 +54,10 @@ class Emitter(object):
         return self
 
     def off(self, event=None, func=None):
+        log.debug('off(event: %s, func: %s)', repr(event), repr(func))
+
+        self.ensure_constructed()
+
         if event and event not in self.__callbacks:
             return self
 
@@ -66,6 +76,10 @@ class Emitter(object):
         return self
 
     def emit(self, event, *args, **kwargs):
+        log.debug('emit(event: %s, args: %s, kwargs: %s)', repr(event), repr(args), repr(kwargs))
+
+        self.ensure_constructed()
+
         if event not in self.__callbacks:
             return
 
@@ -73,3 +87,19 @@ class Emitter(object):
             callback(*args, **kwargs)
 
         return self
+
+
+def on(emitter, event, func=None):
+    return emitter.on(event, func)
+
+
+def once(emitter, event, func=None):
+    return emitter.once(event, func)
+
+
+def off(emitter, event, func=None):
+    return emitter.off(event, func)
+
+
+def emit(emitter, event, *args, **kwargs):
+    return emitter.emit(event, *args, **kwargs)
