@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 log = logging.getLogger(__name__)
 
@@ -84,7 +85,10 @@ class Emitter(object):
             return
 
         for callback in self.__callbacks[event]:
-            callback(*args, **kwargs)
+            try:
+                callback(*args, **kwargs)
+            except Exception, e:
+                log.warn('Exception raised in callback for "%s" %s', event, traceback.format_exc())
 
         return self
 
