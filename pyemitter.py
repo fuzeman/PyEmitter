@@ -94,7 +94,11 @@ class Emitter(object):
 
 
 def on(emitter, event, func=None):
-    return emitter.on(event, func)
+    emitter.on(event, func)
+
+    return {
+        'destroy': lambda: emitter.off(event, func)
+    }
 
 
 def once(emitter, event, func=None):
