@@ -1,1 +1,3 @@
 *.pyc
+
+/PyEmitter.egg-info
