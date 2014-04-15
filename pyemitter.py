@@ -88,7 +88,7 @@ class Emitter(object):
             try:
                 callback(*args, **kwargs)
             except Exception, e:
-                log.warn('Exception raised in callback for event "%s" - %s', event, traceback.format_exc())
+                log.warn('Exception raised in callback %s for event "%s" - %s', callback, event, traceback.format_exc())
 
         return self
 
