@@ -92,6 +92,34 @@ class Emitter(object):
 
         return self
 
+    def emit_on(self, event, *args, **kwargs):
+        func = kwargs.pop('func', None)
+
+        if not func:
+            # assume decorator, wrap
+            return self.__wrap(self.emit_on, event, *args, **kwargs)
+
+        log.debug('emit_on(event: %s, func: %s, args: %s, kwargs: %s)', repr(event), repr(func), repr(args), repr(kwargs))
+
+        # Bind func from wrapper
+        self.on(event, func)
+
+        # Emit event (calling 'func')
+        self.emit(event, *args, **kwargs)
+
+    def pipe(self, events, other):
+        if type(events) is not list:
+            events = [events]
+
+        log.debug('pipe(events: %s, other: %s)', repr(events), repr(other))
+
+        self.ensure_constructed()
+
+        for event in events:
+            self.on(event, lambda *args, **kwargs: other.emit(event, *args, **kwargs))
+
+        return self
+
 
 def on(emitter, event, func=None):
     emitter.on(event, func)
