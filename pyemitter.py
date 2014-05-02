@@ -1,3 +1,4 @@
+from threading import Event
 import logging
 import traceback
 
@@ -22,20 +23,24 @@ class Emitter(object):
 
         return wrap
 
-    def on(self, event, func=None):
+    def on(self, events, func=None):
         if not func:
             # assume decorator, wrap
-            return self.__wrap(self.on, event)
+            return self.__wrap(self.on, events)
 
-        log.debug('on(event: %s, func: %s)', repr(event), repr(func))
+        if not isinstance(events, (list, tuple)):
+            events = [events]
+
+        log.debug('on(events: %s, func: %s)', repr(events), repr(func))
 
         self.ensure_constructed()
 
-        if event not in self.__callbacks:
-            self.__callbacks[event] = []
+        for event in events:
+            if event not in self.__callbacks:
+                self.__callbacks[event] = []
 
-        # Bind callback to event
-        self.__callbacks[event].append(func)
+            # Bind callback to event
+            self.__callbacks[event].append(func)
 
         return self
 
@@ -119,6 +124,40 @@ class Emitter(object):
             self.on(event, lambda *args, **kwargs: other.emit(event, *args, **kwargs))
 
         return self
+
+    def wait(self, timeout=None, ev_success=('success',), ev_error=('error',)):
+        event = Event()
+
+        result = {}
+        error = {}
+
+        @self.on(ev_success)
+        def on_success(*args, **kwargs):
+            result.update({
+                'args': args,
+                'kwargs': kwargs
+            })
+            event.set()
+
+        @self.on(ev_error)
+        def on_error(*args, **kwargs):
+            error.update({
+                'args': args,
+                'kwargs': kwargs
+            })
+            event.set()
+
+        event.wait(timeout)
+
+        if error:
+            raise Exception('Exception returned from emitter', error)
+
+        args = list(result['args']) + result['kwargs'].values()
+
+        if len(args) == 1:
+            return args[0]
+
+        return args or None
 
 
 def on(emitter, event, func=None):
