@@ -23,10 +23,10 @@ class Emitter(object):
 
         return wrap
 
-    def on(self, events, func=None):
+    def on(self, events, func=None, on_bound=None):
         if not func:
             # assume decorator, wrap
-            return self.__wrap(self.on, events)
+            return self.__wrap(self.on, events, on_bound=on_bound)
 
         if not isinstance(events, (list, tuple)):
             events = [events]
@@ -41,6 +41,10 @@ class Emitter(object):
 
             # Bind callback to event
             self.__callbacks[event].append(func)
+
+        # Call 'on_bound' callback
+        if on_bound:
+            on_bound()
 
         return self
 
@@ -125,7 +129,7 @@ class Emitter(object):
 
         return self
 
-    def wait(self, timeout=None, ev_success=('success',), ev_error=('error',)):
+    def wait(self, timeout=None, ev_success=('success',), ev_error=('error',), on_bound=None):
         event = Event()
 
         result = {}
@@ -146,6 +150,10 @@ class Emitter(object):
                 'kwargs': kwargs
             })
             event.set()
+
+        # Call 'on_bound' callback
+        if on_bound:
+            on_bound()
 
         event.wait(timeout)
 
