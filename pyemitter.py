@@ -44,7 +44,7 @@ class Emitter(object):
 
         # Call 'on_bound' callback
         if on_bound:
-            on_bound()
+            call_wrapper(on_bound)
 
         return self
 
@@ -94,10 +94,7 @@ class Emitter(object):
             return
 
         for callback in self.__callbacks[event]:
-            try:
-                callback(*args, **kwargs)
-            except Exception, e:
-                log.warn('Exception raised in callback %s for event "%s" - %s', callback, event, traceback.format_exc())
+            call_wrapper(callback, args, kwargs, event)
 
         return self
 
@@ -129,44 +126,6 @@ class Emitter(object):
 
         return self
 
-    def wait(self, timeout=None, ev_success=('success',), ev_error=('error',), on_bound=None):
-        event = Event()
-
-        result = {}
-        error = {}
-
-        @self.on(ev_success)
-        def on_success(*args, **kwargs):
-            result.update({
-                'args': args,
-                'kwargs': kwargs
-            })
-            event.set()
-
-        @self.on(ev_error)
-        def on_error(*args, **kwargs):
-            error.update({
-                'args': args,
-                'kwargs': kwargs
-            })
-            event.set()
-
-        # Call 'on_bound' callback
-        if on_bound:
-            on_bound()
-
-        event.wait(timeout)
-
-        if error:
-            raise Exception('Exception returned from emitter', error)
-
-        args = list(result['args']) + result['kwargs'].values()
-
-        if len(args) == 1:
-            return args[0]
-
-        return args or None
-
 
 def on(emitter, event, func=None):
     emitter.on(event, func)
@@ -186,3 +145,12 @@ def off(emitter, event, func=None):
 
 def emit(emitter, event, *args, **kwargs):
     return emitter.emit(event, *args, **kwargs)
+
+
+def call_wrapper(callback, args=None, kwargs=None, event=None):
+    try:
+        callback(*(args or ()), **(kwargs or {}))
+        return True
+    except Exception, e:
+        log.warn('Exception raised in callback %s for event "%s" - %s', callback, event, traceback.format_exc())
+        return False
