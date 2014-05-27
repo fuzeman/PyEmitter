@@ -10,11 +10,12 @@ class Emitter(object):
     threading_workers = 2
 
     __constructed = False
+    __name = None
 
     __callbacks = None
     __threading_pool = None
 
-    def ensure_constructed(self):
+    def __ensure_constructed(self):
         if self.__constructed:
             return
 
@@ -22,7 +23,19 @@ class Emitter(object):
         self.__constructed = True
 
         if self.threading:
-            self.__threading_pool = ThreadPoolExecutor(max_workers = self.threading_workers)
+            self.__threading_pool = ThreadPoolExecutor(max_workers=self.threading_workers)
+
+    def __log(self, message, *args, **kwargs):
+        if self.__name is None:
+            self.__name = '%s.%s' % (
+                self.__module__,
+                self.__class__.__name__
+            )
+
+        log.debug(
+            ('[%s]:' % self.__name.ljust(34)) + str(message),
+            *args, **kwargs
+        )
 
     def __wrap(self, callback, *args, **kwargs):
         def wrap(func):
@@ -39,9 +52,9 @@ class Emitter(object):
         if not isinstance(events, (list, tuple)):
             events = [events]
 
-        log.debug('on(events: %s, func: %s)', repr(events), repr(func))
+        self.__log('on(events: %s, func: %s)', repr(events), repr(func))
 
-        self.ensure_constructed()
+        self.__ensure_constructed()
 
         for event in events:
             if event not in self.__callbacks:
@@ -61,7 +74,7 @@ class Emitter(object):
             # assume decorator, wrap
             return self.__wrap(self.once, event)
 
-        log.debug('once(event: %s, func: %s)', repr(event), repr(func))
+        self.__log('once(event: %s, func: %s)', repr(event), repr(func))
 
         def once_callback(*args, **kwargs):
             self.off(event, once_callback)
@@ -72,9 +85,9 @@ class Emitter(object):
         return self
 
     def off(self, event=None, func=None):
-        log.debug('off(event: %s, func: %s)', repr(event), repr(func))
+        self.__log('off(event: %s, func: %s)', repr(event), repr(func))
 
-        self.ensure_constructed()
+        self.__ensure_constructed()
 
         if event and event not in self.__callbacks:
             return self
@@ -94,9 +107,9 @@ class Emitter(object):
         return self
 
     def emit(self, event, *args, **kwargs):
-        log.debug('emit(event: %s, args: %s, kwargs: %s)', repr(event), repr(args), repr(kwargs))
+        self.__log('emit(event: %s, args: %s, kwargs: %s)', repr(event), repr(args), repr(kwargs))
 
-        self.ensure_constructed()
+        self.__ensure_constructed()
 
         if event not in self.__callbacks:
             return
@@ -113,7 +126,7 @@ class Emitter(object):
             # assume decorator, wrap
             return self.__wrap(self.emit_on, event, *args, **kwargs)
 
-        log.debug('emit_on(event: %s, func: %s, args: %s, kwargs: %s)', repr(event), repr(func), repr(args), repr(kwargs))
+        self.__log('emit_on(event: %s, func: %s, args: %s, kwargs: %s)', repr(event), repr(func), repr(args), repr(kwargs))
 
         # Bind func from wrapper
         self.on(event, func)
@@ -125,9 +138,9 @@ class Emitter(object):
         if type(events) is not list:
             events = [events]
 
-        log.debug('pipe(events: %s, other: %s)', repr(events), repr(other))
+        self.__log('pipe(events: %s, other: %s)', repr(events), repr(other))
 
-        self.ensure_constructed()
+        self.__ensure_constructed()
 
         for event in events:
             self.on(event, lambda *args, **kwargs: other.emit(event, *args, **kwargs))
