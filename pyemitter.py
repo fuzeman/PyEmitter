@@ -152,9 +152,9 @@ class Emitter(object):
         kwargs = kwargs or {}
 
         if self.threading:
-            self.__call_async(callback, args, kwargs, event)
-        else:
-            self.__call_sync(callback, args, kwargs, event)
+            return self.__call_async(callback, args, kwargs, event)
+
+        return self.__call_sync(callback, args, kwargs, event)
 
     @staticmethod
     def __call_sync(callback, args=None, kwargs=None, event=None):
