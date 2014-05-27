@@ -114,7 +114,7 @@ class Emitter(object):
         if event not in self.__callbacks:
             return
 
-        for callback in self.__callbacks[event]:
+        for callback in list(self.__callbacks[event]):
             self.__call(callback, args, kwargs, event)
 
         return self
