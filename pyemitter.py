@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 import logging
 import traceback
 
@@ -5,15 +6,36 @@ log = logging.getLogger(__name__)
 
 
 class Emitter(object):
-    __constructed = False
-    __callbacks = None
+    threading = False
+    threading_workers = 2
 
-    def ensure_constructed(self):
+    __constructed = False
+    __name = None
+
+    __callbacks = None
+    __threading_pool = None
+
+    def __ensure_constructed(self):
         if self.__constructed:
             return
 
         self.__callbacks = {}
         self.__constructed = True
+
+        if self.threading:
+            self.__threading_pool = ThreadPoolExecutor(max_workers=self.threading_workers)
+
+    def __log(self, message, *args, **kwargs):
+        if self.__name is None:
+            self.__name = '%s.%s' % (
+                self.__module__,
+                self.__class__.__name__
+            )
+
+        log.debug(
+            ('[%s]:' % self.__name.ljust(34)) + str(message),
+            *args, **kwargs
+        )
 
     def __wrap(self, callback, *args, **kwargs):
         def wrap(func):
@@ -22,20 +44,28 @@ class Emitter(object):
 
         return wrap
 
-    def on(self, event, func=None):
+    def on(self, events, func=None, on_bound=None):
         if not func:
             # assume decorator, wrap
-            return self.__wrap(self.on, event)
+            return self.__wrap(self.on, events, on_bound=on_bound)
 
-        log.debug('on(event: %s, func: %s)', repr(event), repr(func))
+        if not isinstance(events, (list, tuple)):
+            events = [events]
 
-        self.ensure_constructed()
+        self.__log('on(events: %s, func: %s)', repr(events), repr(func))
 
-        if event not in self.__callbacks:
-            self.__callbacks[event] = []
+        self.__ensure_constructed()
 
-        # Bind callback to event
-        self.__callbacks[event].append(func)
+        for event in events:
+            if event not in self.__callbacks:
+                self.__callbacks[event] = []
+
+            # Bind callback to event
+            self.__callbacks[event].append(func)
+
+        # Call 'on_bound' callback
+        if on_bound:
+            self.__call(on_bound)
 
         return self
 
@@ -44,7 +74,7 @@ class Emitter(object):
             # assume decorator, wrap
             return self.__wrap(self.once, event)
 
-        log.debug('once(event: %s, func: %s)', repr(event), repr(func))
+        self.__log('once(event: %s, func: %s)', repr(event), repr(func))
 
         def once_callback(*args, **kwargs):
             self.off(event, once_callback)
@@ -55,9 +85,9 @@ class Emitter(object):
         return self
 
     def off(self, event=None, func=None):
-        log.debug('off(event: %s, func: %s)', repr(event), repr(func))
+        self.__log('off(event: %s, func: %s)', repr(event), repr(func))
 
-        self.ensure_constructed()
+        self.__ensure_constructed()
 
         if event and event not in self.__callbacks:
             return self
@@ -77,20 +107,67 @@ class Emitter(object):
         return self
 
     def emit(self, event, *args, **kwargs):
-        log.debug('emit(event: %s, args: %s, kwargs: %s)', repr(event), repr(args), repr(kwargs))
+        self.__log('emit(event: %s, args: %s, kwargs: %s)', repr(event), repr(args), repr(kwargs))
 
-        self.ensure_constructed()
+        self.__ensure_constructed()
 
         if event not in self.__callbacks:
             return
 
-        for callback in self.__callbacks[event]:
-            try:
-                callback(*args, **kwargs)
-            except Exception, e:
-                log.warn('Exception raised in callback %s for event "%s" - %s', callback, event, traceback.format_exc())
+        for callback in list(self.__callbacks[event]):
+            self.__call(callback, args, kwargs, event)
 
         return self
+
+    def emit_on(self, event, *args, **kwargs):
+        func = kwargs.pop('func', None)
+
+        if not func:
+            # assume decorator, wrap
+            return self.__wrap(self.emit_on, event, *args, **kwargs)
+
+        self.__log('emit_on(event: %s, func: %s, args: %s, kwargs: %s)', repr(event), repr(func), repr(args), repr(kwargs))
+
+        # Bind func from wrapper
+        self.on(event, func)
+
+        # Emit event (calling 'func')
+        self.emit(event, *args, **kwargs)
+
+    def pipe(self, events, other):
+        if type(events) is not list:
+            events = [events]
+
+        self.__log('pipe(events: %s, other: %s)', repr(events), repr(other))
+
+        self.__ensure_constructed()
+
+        for event in events:
+            self.on(event, lambda *args, **kwargs: other.emit(event, *args, **kwargs))
+
+        return self
+
+    def __call(self, callback, args=None, kwargs=None, event=None):
+        args = args or ()
+        kwargs = kwargs or {}
+
+        if self.threading:
+            return self.__call_async(callback, args, kwargs, event)
+
+        return self.__call_sync(callback, args, kwargs, event)
+
+    @staticmethod
+    def __call_sync(callback, args=None, kwargs=None, event=None):
+        try:
+            callback(*args, **kwargs)
+
+            return True
+        except Exception, e:
+            log.warn('Exception raised in callback %s for event "%s" - %s', callback, event, traceback.format_exc())
+            return False
+
+    def __call_async(self, callback, args=None, kwargs=None, event=None):
+        self.__threading_pool.submit(self.__call_sync, callback, args, kwargs, event)
 
 
 def on(emitter, event, func=None):
