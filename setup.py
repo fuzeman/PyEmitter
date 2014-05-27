@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='PyEmitter',
-    version='1.1.0',
+    version='1.1.1',
     url='http://github.com/fuzeman/PyEmitter/',
 
     author='Dean Gardiner',
