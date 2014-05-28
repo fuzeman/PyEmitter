@@ -152,7 +152,7 @@ class Emitter(object):
         self.__ensure_constructed()
 
         for event in events:
-            self.on(event, lambda *args, **kwargs: other.emit(event, *args, **kwargs))
+            self.on(event, PipeHandler(event, other.emit))
 
         return self
 
@@ -177,6 +177,15 @@ class Emitter(object):
 
     def __call_async(self, callback, args=None, kwargs=None, event=None):
         self.__threading_pool.submit(self.__call_sync, callback, args, kwargs, event)
+
+
+class PipeHandler(object):
+    def __init__(self, event, callback):
+        self.event = event
+        self.callback = callback
+
+    def __call__(self, *args, **kwargs):
+        self.callback(self.event, *args, **kwargs)
 
 
 def on(emitter, event, func=None):
