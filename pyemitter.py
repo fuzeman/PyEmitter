@@ -116,7 +116,10 @@ class Emitter(object):
         return self
 
     def emit(self, event, *args, **kwargs):
-        self.__log('emit(event: %s, args: %s, kwargs: %s)', repr(event), repr(args), repr(kwargs))
+        suppress = kwargs.pop('__suppress', False)
+
+        if not suppress:
+            self.__log('emit(event: %s, args: %s, kwargs: %s)', repr(event), repr(args), repr(kwargs))
 
         self.__ensure_constructed()
 
