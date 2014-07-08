@@ -116,7 +116,10 @@ class Emitter(object):
         return self
 
     def emit(self, event, *args, **kwargs):
-        self.__log('emit(event: %s, args: %s, kwargs: %s)', repr(event), repr(args), repr(kwargs))
+        suppress = kwargs.pop('__suppress', False)
+
+        if not suppress:
+            self.__log('emit(event: %s, args: %s, kwargs: %s)', repr(event), repr_trim(args), repr_trim(kwargs))
 
         self.__ensure_constructed()
 
@@ -152,7 +155,7 @@ class Emitter(object):
         self.__ensure_constructed()
 
         for event in events:
-            self.on(event, lambda *args, **kwargs: other.emit(event, *args, **kwargs))
+            self.on(event, PipeHandler(event, other.emit))
 
         return self
 
@@ -179,6 +182,15 @@ class Emitter(object):
         self.__threading_pool.submit(self.__call_sync, callback, args, kwargs, event)
 
 
+class PipeHandler(object):
+    def __init__(self, event, callback):
+        self.event = event
+        self.callback = callback
+
+    def __call__(self, *args, **kwargs):
+        self.callback(self.event, *args, **kwargs)
+
+
 def on(emitter, event, func=None):
     emitter.on(event, func)
 
@@ -197,3 +209,12 @@ def off(emitter, event, func=None):
 
 def emit(emitter, event, *args, **kwargs):
     return emitter.emit(event, *args, **kwargs)
+
+
+def repr_trim(value, length=1000):
+    value = repr(value)
+
+    if len(value) < length:
+        return value
+
+    return '<%s - %s characters>' % (type(value).__name__, len(value))
